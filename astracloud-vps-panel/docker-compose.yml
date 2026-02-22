@@ -1,0 +1,59 @@
+version: '3.8'
+
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: ../docker/backend.Dockerfile
+    container_name: astracloud-backend
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      - NODE_ENV=production
+    volumes:
+      - backend-logs:/app/logs
+    networks:
+      - astracloud-network
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:5000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: ../docker/frontend.Dockerfile
+    container_name: astracloud-frontend
+    restart: unless-stopped
+    networks:
+      - astracloud-network
+    depends_on:
+      - backend
+
+  nginx:
+    image: nginx:alpine
+    container_name: astracloud-nginx
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./docker/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./frontend/dist:/usr/share/nginx/html:ro
+      # Uncomment for SSL
+      # - ./ssl:/etc/nginx/ssl:ro
+    networks:
+      - astracloud-network
+    depends_on:
+      - backend
+      - frontend
+
+networks:
+  astracloud-network:
+    driver: bridge
+
+volumes:
+  backend-logs:
